@@ -1,0 +1,331 @@
+//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#pragma hdrstop
+
+#include "UTForm.h"
+#include "UTRSA.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+extern _INFO Info;
+TForm1 *Form1;
+//---------------------------------------------------------------------------
+__fastcall TForm1::TForm1(TComponent* Owner)
+        : TForm(Owner)
+{
+randomize();
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::Button1Click(TObject *Sender)
+{
+History->Lines->Add(TimeToStr(Time())+" =====ГЕНЕРАЦИЯ КЛЮЧЕЙ НАЧАТА=====");
+TRSA a(Edit4->Text.ToInt());
+
+char* tmp = a.KeyModul;
+KEY_N->Text = AnsiString(tmp);
+tmp = a.OpenKey;
+KEY_E->Text = AnsiString(tmp);
+tmp = a.SecretKey;
+KEY_D->Text = AnsiString(tmp);
+
+History->Lines->Add("Вычисляем произведение: N=p*q="+(IntToStr(Info.InfoP))+"*"+IntToStr(Info.InfoQ)+"="+KEY_N->Text);
+History->Lines->Add("Вычисляем функцию Эйлера: phi(N)=(p-1)*(q-1)="+FloatToStr(Info.InfoPhi));
+History->Lines->Add("Выбираем открытую экспоненту: E="+KEY_E->Text);
+History->Lines->Add("Вычисляем секретную экспоненту: D*E=1 mod phi(N);");
+History->Lines->Add("D*"+KEY_E->Text+"=1 mod "+Info.InfoPhi+"; D="+KEY_D->Text);
+History->Lines->Add("Пара E, N - открытый ключ RSA (public key): "+KEY_E->Text+"; "+KEY_N->Text);
+History->Lines->Add("Пара D, N - секретный ключ RSA (private key): "+KEY_D->Text+"; "+KEY_N->Text);
+History->Lines->Add(TimeToStr(Time())+" =====ГЕНЕРАЦИЯ КЛЮЧЕЙ ЗАВЕРШЕНА=====");
+Button2->Enabled=True;
+Export_Publ->Enabled=True;
+Export_Priv->Enabled=True;
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::Button2Click(TObject *Sender)
+{
+if(Memo1->Text != "")
+{
+if (KEY_N->Text !="" || KEY_E->Text !="")
+{
+History->Lines->Add(TimeToStr(Time())+" =====ПРОЦЕСС ШИФРОВАНИЯ НАЧАТ=====");
+TNumber n(KEY_N->Text.c_str());
+TNumber e(KEY_E->Text.c_str());
+TNumber d(KEY_D->Text.c_str());
+
+THexString text;
+text.AsCharString = Memo1->Text;
+
+  TRSA a(n,e,Edit4->Text.ToInt());
+  a.PlainText = text;
+  Memo3->Text = a.CryptedText.AsHexString;
+  Button6->Enabled = True;
+  Button4->Enabled=True;
+
+  History->Lines->Add(TimeToStr(Time())+" =====ПРОЦЕСС ШИФРОВАНИЯ ЗАВЕРШЕН=====");
+}
+else
+ShowMessage("Отсутствует открытый ключ");
+}
+else
+ShowMessage("Отсутствует текст для шифрования");
+}
+
+//---------------------------------------------------------------------------
+void __fastcall TForm1::Button4Click(TObject *Sender)
+{
+if(Memo3->Text != "")
+{
+if (KEY_N->Text !="" || KEY_D->Text !="")
+{
+History->Lines->Add(TimeToStr(Time())+" =====ПРОЦЕСС РАСШИФРОВАНИЯ НАЧАТ=====");
+TNumber n(KEY_N->Text.c_str());
+TNumber e(KEY_E->Text.c_str());
+TNumber d(KEY_D->Text.c_str());
+
+THexString text;
+text.AsHexString = Memo3->Text;
+
+  TRSA a(n,e,d,Edit4->Text.ToInt());
+  a.CryptedText = text;
+  Memo2->Text = a.PlainText.AsCharString;
+  Button5->Enabled = True;
+
+  History->Lines->Add(TimeToStr(Time())+" =====ПРОЦЕСС РАСШИФРОВАНИЯ ЗАВЕРШЕН=====");
+  }
+else
+ShowMessage("Отсутствует закрытый ключ");
+
+}
+else
+ShowMessage("Отсутствует текст для расшифрования");
+}
+
+//---------------------------------------------------------------------------
+
+
+
+void __fastcall TForm1::Button3Click(TObject *Sender)
+{
+TOpenDialog *od = new TOpenDialog(this);
+od->Filter = "Текстовые файлы|*.txt";
+if (od->Execute()) {
+  Memo1->Lines->LoadFromFile(od->FileName);
+ 
+}
+History->Lines->Add("Импорт открытого файла: "+od->FileName);
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button5Click(TObject *Sender)
+{
+TSaveDialog *od = new TSaveDialog(this);
+od->Filter = "Текстовые файлы|*.txt";
+if( od ->Execute())
+ {
+      Memo2->Lines->SaveToFile(od ->FileName + ".txt");
+      History->Lines->Add("Экспорт расшифрованного файла: "+od->FileName);
+ }
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TForm1::Button6Click(TObject *Sender)
+{
+TSaveDialog *od = new TSaveDialog(this);
+od->Filter = "Текстовые файлы|*.txt";
+if(od ->Execute())
+ {
+      Memo3->Lines->SaveToFile(od ->FileName + ".txt");
+      History->Lines->Add("Экспорт зашифрованного файла: "+od->FileName);
+ }
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+
+
+void __fastcall TForm1::Export_PublClick(TObject *Sender)
+{
+if (KEY_N->Text !="" || KEY_E->Text !="")
+{
+TStringList*s=new TStringList;
+s->Add(KEY_E->Text);
+s->Add(KEY_N->Text);
+s->Add(Edit4->Text); //длина ключа
+TSaveDialog *od = new TSaveDialog(this);
+od->Filter = "Открытые ключевые файлы|*.pubkey";
+if(od ->Execute())
+ {
+      s->SaveToFile(od ->FileName + ".pubkey");
+      delete s;
+      History->Lines->Add("Экспорт открытого ключа: "+od->FileName+".pubkey");
+ }
+delete od;
+od = NULL;
+}
+else
+ShowMessage("Значения N и E пустые!");
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Export_PrivClick(TObject *Sender)
+{
+if (KEY_N->Text !="" || KEY_D->Text !="")
+{
+TStringList*s=new TStringList;
+s->Add(KEY_D->Text);
+s->Add(KEY_N->Text);
+s->Add(Edit4->Text); //длина ключа
+TSaveDialog *od = new TSaveDialog(this);
+od->Filter = "Закрытые ключевые файлы|*.privkey";
+if(od ->Execute())
+ {
+      s->SaveToFile(od ->FileName + ".privkey");
+      delete s;
+      History->Lines->Add("Экспорт закрытого ключа: "+od->FileName+".privkey");
+ }
+delete od;
+od = NULL;
+}
+else
+ShowMessage("Значения N и D пустые!");
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Import_PublClick(TObject *Sender)
+{
+TStringList*s=new TStringList;
+TOpenDialog *od = new TOpenDialog(this);
+od->Filter = "Открытые ключевые файлы|*.pubkey";
+if (od->Execute()) {
+  s->LoadFromFile(od->FileName);
+  KEY_E->Text=s->Strings[0];    //Перенос значения E
+  KEY_N->Text=s->Strings[1];    //Перенос значения N
+  Edit4->Text=s->Strings[2];    //Перенос значения длины ключа
+  delete s;
+  Button2->Enabled=True;
+}
+History->Lines->Add("Импорт открытого ключа: "+od->FileName);
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TForm1::Import_PrivClick(TObject *Sender)
+{
+TStringList*s=new TStringList;
+TOpenDialog *od = new TOpenDialog(this);
+od->Filter = "Закрытые ключевые файлы|*.privkey";
+if (od->Execute()) {
+  s->LoadFromFile(od->FileName);
+  KEY_D->Text=s->Strings[0];    //Перенос значения D
+  KEY_N->Text=s->Strings[1];    //Перенос значения N
+  Edit4->Text=s->Strings[2];    //Перенос значения длины ключа
+  delete s;
+  Button4->Enabled=true;
+}
+History->Lines->Add("Импорт открытого ключа: "+od->FileName);
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button7Click(TObject *Sender)
+{
+TSaveDialog *od = new TSaveDialog(this);
+od->Filter = "Текстовые файлы|*.txt";
+if( od ->Execute())
+ {
+      Memo3->Lines->SaveToFile(od ->FileName + ".txt");
+      History->Lines->Add("Экспорт зашифрованного текста: "+od->FileName);
+ }
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+
+
+
+
+
+void __fastcall TForm1::RadioGroup1Click(TObject *Sender)
+{
+if (RadioGroup1->ItemIndex==0)
+{
+ShowMessage("Привет");
+}
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::RadioButton1Click(TObject *Sender)
+{
+if (RadioButton1->Checked)
+{
+Group_Decode->Visible=False;
+Group_Code->Visible=True;
+Button4->Visible=False;
+Button3->Visible=True;
+Button2->Visible=True;
+Button8->Visible=False;
+Group_Shifr->Top=320;
+}
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::RadioButton2Click(TObject *Sender)
+{
+if (RadioButton2->Checked)
+{
+Group_Decode->Visible=True;
+Group_Decode->Top=320;
+Group_Code->Visible=False;
+Button3->Visible=False;
+Button4->Visible=True;
+Button2->Visible=False;
+Button8->Visible=True;
+Group_Shifr->Top=160;
+}
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button8Click(TObject *Sender)
+{
+ TOpenDialog *od = new TOpenDialog(this);
+od->Filter = "Текстовые файлы|*.txt";
+if (od->Execute()) {
+  Memo3->Lines->LoadFromFile(od->FileName);
+   Button4->Enabled=True;
+}
+History->Lines->Add("Импорт зашифрованного файла: "+od->FileName);
+delete od;
+od = NULL;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Edit4Change(TObject *Sender)
+{
+Button2->Enabled=false;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::FormCreate(TObject *Sender)
+{
+History->Lines->Add(TimeToStr(Time())+" =====ЗАПУСК ПРОГРАММЫ=====");        
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::UpDown1Click(TObject *Sender, TUDBtnType Button)
+{
+KEY_N->Text="";
+KEY_D->Text="";        
+}
+//---------------------------------------------------------------------------
+
